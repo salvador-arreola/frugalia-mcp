@@ -1,0 +1,21 @@
+name: frugalia-mcp
+framework: fastmcp-python
+version: 0.1.0
+description: MCP server built with fastmcp-python
+secrets:
+    local:
+        enabled: false
+        provider: env
+        file: .env.local
+    production:
+        enabled: false
+        provider: kubernetes
+        secretName: frugalia-mcp-secrets-production
+        namespace: default
+    staging:
+        enabled: false
+        provider: kubernetes
+        secretName: frugalia-mcp-secrets-staging
+        namespace: default
+created_at: 2025-11-21T09:46:40.011398-06:00
+updated_at: 2025-11-21T09:46:40.043704-06:00
