@@ -7,9 +7,8 @@ Do not edit manually - it will be overwritten when tools are loaded.
 from .analyze_rightsizing import analyze_rightsizing
 from .apply_resource_patch import apply_resource_patch
 from .detect_zombie_resources import detect_zombie_resources
-from .get_cost_data import get_cost_data
 from .get_kubernetes_resources import get_kubernetes_resources
 from .get_prometheus_metrics import get_prometheus_metrics
 from .identify_spot_candidates import identify_spot_candidates
 
-__all__ = ["analyze_rightsizing", "apply_resource_patch", "detect_zombie_resources", "get_cost_data", "get_kubernetes_resources", "get_prometheus_metrics", "identify_spot_candidates"]
+__all__ = ["analyze_rightsizing", "apply_resource_patch", "detect_zombie_resources", "get_kubernetes_resources", "get_prometheus_metrics", "identify_spot_candidates"]

@@ -18,9 +18,14 @@ def apply_resource_patch(
     This tool applies a patch to a Kubernetes resource or deletes it.
 
     Args:
-        resource_type: The type of resource (e.g., "deployment", "persistentvolumeclaim").
+        resource_type: The type of resource. Supported types:
+            - "deployment" (patch/delete)
+            - "persistentvolumeclaim" (delete)
+            - "persistentvolume" (delete, cluster-scoped)
+            - "service" (delete)
+            - "loadbalancer" (delete, alias for service type LoadBalancer)
         name: The name of the resource.
-        namespace: The namespace of the resource.
+        namespace: The namespace of the resource (not required for persistentvolume).
         action: The action to perform ("patch" or "delete").
         patch_body: The patch to apply (for "patch" action).
 
@@ -51,12 +56,23 @@ def apply_resource_patch(
             if resource_type == "persistentvolumeclaim":
                 core_v1.delete_namespaced_persistent_volume_claim(name, namespace)
                 return {"success": f"PVC {name} in namespace {namespace} deleted successfully."}
+            elif resource_type == "persistentvolume":
+                # PersistentVolumes are cluster-scoped (no namespace)
+                core_v1.delete_persistent_volume(name)
+                return {"success": f"PersistentVolume {name} deleted successfully."}
+            elif resource_type == "service":
+                core_v1.delete_namespaced_service(name, namespace)
+                return {"success": f"Service {name} in namespace {namespace} deleted successfully."}
+            elif resource_type == "loadbalancer":
+                # LoadBalancer is actually a Service type, so delete as service
+                core_v1.delete_namespaced_service(name, namespace)
+                return {"success": f"LoadBalancer service {name} in namespace {namespace} deleted successfully."}
             elif resource_type == "deployment":
                 apps_v1.delete_namespaced_deployment(name, namespace)
                 return {"success": f"Deployment {name} in namespace {namespace} deleted successfully."}
             else:
                 return {"error": f"Delete action for resource type {resource_type} is not supported."}
-                
+
         else:
             return {"error": f"Unsupported action: {action}"}
 
