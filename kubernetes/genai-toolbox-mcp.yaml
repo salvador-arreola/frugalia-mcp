@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frugalia-tools-config
+  namespace: kagent
+data:
+  frugalia-billing-queries.yaml: |
+    sources:
+      test-bigquery:
+        kind: "bigquery"
+        project: ${BIGQUERY_PROJECT}
+        location: ${BIGQUERY_LOCATION:US}
+        useClientOAuth: ${BIGQUERY_USE_CLIENT_OAUTH:false}
+
+    tools:
+      test_billing_query:
+        kind: bigquery-sql
+        source: test-bigquery
+        description: Simple test query to verify BigQuery connection
+        statement: |
+          SELECT
+            DATE(usage_start_time) as date,
+            service.description as service,
+            SUM(cost) as total_cost,
+            currency
+          FROM `${BIGQUERY_BILLING_DATASET}.${BIGQUERY_BILLING_TABLE}`
+          WHERE DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+          GROUP BY date, service, currency
+          ORDER BY date DESC, total_cost DESC
+          LIMIT 10;
+
+    toolsets:
+      test:
+        - test_billing_query
+---
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: genai-toolbox
+  namespace: kagent
+  labels:
+    kagent.dev/discovery: disabled
+spec:
+  transportType: stdio
+  stdioTransport: {}
+  deployment:
+    image: us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:0.21.0
+    cmd: "/toolbox"
+    args:
+      - "--tools-file"
+      - "/configs/frugalia-billing-queries.yaml"
+      - "--stdio"
+    port: 3000
+    configMapRefs:
+      - name: frugalia-tools-config
+    env:
+      BIGQUERY_PROJECT: "level-elevator-474703-b3"
+      BIGQUERY_LOCATION: "US"
+      BIGQUERY_BILLING_DATASET: "billing_export"
+      BIGQUERY_BILLING_TABLE: "gcp_billing_export_v1_018740_3FD1B7_70949B"
+      BIGQUERY_PRICING_TABLE: "cloud_pricing_export"
+      BIGQUERY_USE_CLIENT_OAUTH: "false"
+    volumeMounts:
+      - name: frugalia-tools-config
+        mountPath: /configs
+        readOnly: true
+    volumes:
+    - name: frugalia-tools-config
+      configMap:
+        name: frugalia-tools-config

@@ -1,0 +1,14 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: crashloop-tools-only
+  namespace: kagent
+spec:
+  targetRefs:
+    - name: incident-responder-backend
+      kind: Backend
+      group: gateway.networking.k8s.io
+  rbac:
+    policy:
+      matchExpressions:
+      - 'mcp.tool.name in ["quick_pod_health_check", "restart_owner_deployment"]'

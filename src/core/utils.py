@@ -93,10 +93,8 @@ def query_prometheus(
             - data: Query results from Prometheus
             - query: Original query executed
     """
-    config = get_tool_config("get_prometheus_metrics")
-
-    # Get Prometheus URL from config
-    prometheus_url = config.get("prometheus_url", "http://localhost:9090")
+    # Get Prometheus URL from environment variable, fallback to Kubernetes service
+    prometheus_url = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090")
 
     try:
         # Connect to Prometheus

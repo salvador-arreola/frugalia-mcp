@@ -1,0 +1,19 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: mcp-backend
+  namespace: kagent
+spec:
+  type: MCP
+  mcp:
+    targets:
+    - name: frugalia-mcp
+      static:
+        host: frugalia-mcp.kagent.svc.cluster.local
+        port: 3000
+        protocol: StreamableHTTP
+    - name: genai-toolbox
+      static:
+        host: genai-toolbox.kagent.svc.cluster.local
+        port: 3000
+        protocol: StreamableHTTP

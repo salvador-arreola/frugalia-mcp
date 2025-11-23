@@ -3,7 +3,7 @@ name = "frugalia-mcp"
 version = "0.1.0"
 description = "frugalia-mcp MCP server built with FastMCP"
 authors = [
-    {name = "Unknown Author"}
+    {name = "Salvador Arreola"}
 ]
 readme = "README.md"
 requires-python = ">=3.10"
