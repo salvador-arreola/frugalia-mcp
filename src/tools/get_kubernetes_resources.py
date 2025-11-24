@@ -16,12 +16,20 @@ def get_kubernetes_resources(
     This tool retrieves a list of resources from a Kubernetes cluster.
 
     Args:
-        resource_type: The type of resource to list (e.g., "pod", "service", "deployment").
+        resource_type: The type of resource to list:
+                      - "pod": List pods
+                      - "service": List services
+                      - "deployment": List deployments
+                      - "poddisruptionbudget": List PodDisruptionBudgets (includes PDB details)
         namespace: The namespace to list resources from. If not provided, lists across all namespaces.
+                   IMPORTANT: Always specify namespace for pods to avoid context overflow.
                    When using the MCP inspector, this value must be in double quotes (e.g., "default").
 
     Returns:
-        A dictionary containing the list of resource names and a count.
+        A dictionary containing:
+        - resources: List of resource names (or detailed objects for PDBs)
+        - count: Number of resources found
+        - message: Summary message
     """
     try:
         # Load Kubernetes configuration
@@ -33,6 +41,7 @@ def get_kubernetes_resources(
         api_client = client.ApiClient()
         core_v1 = client.CoreV1Api(api_client)
         apps_v1 = client.AppsV1Api(api_client)
+        policy_v1 = client.PolicyV1Api(api_client)
 
         resources = []
         if resource_type == "pod":
@@ -53,6 +62,21 @@ def get_kubernetes_resources(
             else:
                 ret = apps_v1.list_deployment_for_all_namespaces()
             resources = [item.metadata.name for item in ret.items]
+        elif resource_type == "poddisruptionbudget":
+            if namespace:
+                ret = policy_v1.list_namespaced_pod_disruption_budget(namespace)
+            else:
+                ret = policy_v1.list_pod_disruption_budget_for_all_namespaces()
+            resources = [
+                {
+                    "name": item.metadata.name,
+                    "namespace": item.metadata.namespace,
+                    "min_available": item.spec.min_available,
+                    "max_unavailable": item.spec.max_unavailable,
+                    "selector": item.spec.selector.match_labels if item.spec.selector else None
+                }
+                for item in ret.items
+            ]
         else:
             return {"error": f"Unsupported resource type: {resource_type}"}
 

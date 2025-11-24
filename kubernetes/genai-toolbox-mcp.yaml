@@ -5,34 +5,227 @@ metadata:
   namespace: kagent
 data:
   frugalia-billing-queries.yaml: |
+    # Frugalia - BigQuery Billing Queries Configuration
+    # FINAL VERSION WITH DEFAULTS
+    # Added 'default' and 'required: false' based on tool schema documentation.
+
     sources:
-      test-bigquery:
+      gcp-billing-source:
         kind: "bigquery"
         project: ${BIGQUERY_PROJECT}
         location: ${BIGQUERY_LOCATION:US}
         useClientOAuth: ${BIGQUERY_USE_CLIENT_OAUTH:false}
 
     tools:
-      test_billing_query:
+      # ======================================================
+      # 1. GKE Usage & Rightsizing (Workload View)
+      # ======================================================
+      get_gke_resource_usage_7d:
         kind: bigquery-sql
-        source: test-bigquery
-        description: Simple test query to verify BigQuery connection
+        source: gcp-billing-source
+        description: |
+          Get GKE usage/costs (last 7 days) broken down by Namespace.
+          Highlights 'kube:unallocated' which represents idle capacity (waste) inside nodes.
+          Filters out fixed infrastructure fees to focus on actionable workloads.
+        parameters:
+          - name: cluster_name
+            type: string
+            description: Filter by Cluster Name (leave empty for all clusters).
+            default: ""
+            required: false
+          - name: namespace
+            type: string
+            description: Filter by Namespace (leave empty for all namespaces).
+            default: ""
+            required: false
         statement: |
           SELECT
-            DATE(usage_start_time) as date,
-            service.description as service,
+            (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') as cluster_name,
+            (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') as namespace,
+            sku.description as sku_description,
+            AVG(usage.amount) as avg_daily_usage,
+            MAX(usage.amount) as max_daily_usage,
+            SUM(cost) as cost_7d,
+            currency
+          FROM `${BIGQUERY_BILLING_DATASET}.${BIGQUERY_BILLING_TABLE}`
+          WHERE
+            DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+            AND (service.description = 'Kubernetes Engine' OR service.description = 'Compute Engine')
+            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            -- CLEANUP: Remove infrastructure overhead (nulls)
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
+            -- Dynamic Filters using Named Parameters
+            AND (@cluster_name IS NULL OR @cluster_name = '' OR (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name)
+            AND (@namespace IS NULL OR @namespace = '' OR (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') = @namespace)
+          GROUP BY 1, 2, 3, 7
+          ORDER BY cost_7d DESC;
+
+      # ======================================================
+      # 2. Efficiency & Savings Candidates
+      # ======================================================
+      get_compute_rightsizing_candidates:
+        kind: bigquery-sql
+        source: gcp-billing-source
+        description: |
+          Identify the most expensive GKE workloads (Namespace level) to optimize.
+          Useful for finding 'kube:unallocated' costs which indicate node over-provisioning.
+        parameters:
+          - name: days_back
+            type: integer
+            description: Days to analyze.
+            default: 7
+            required: false
+        statement: |
+          SELECT
+            (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') as cluster_name,
+            (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') as namespace,
+            sku.description,
+            COUNT(DISTINCT DATE(usage_start_time)) as days_with_usage,
+            SUM(cost) as total_cost_period,
+            AVG(cost) as avg_daily_cost,
+            currency,
+            -- Estimate potential savings (assuming 40% optimization possible)
+            SUM(cost) * 0.40 as potential_savings
+          FROM `${BIGQUERY_BILLING_DATASET}.${BIGQUERY_BILLING_TABLE}`
+          WHERE
+            DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 7) DAY)
+            AND (service.description = 'Kubernetes Engine' OR service.description = 'Compute Engine')
+            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            -- FILTER: Remove fixed fees
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
+            AND cost > 0
+          GROUP BY 1, 2, 3, 7
+          HAVING cluster_name IS NOT NULL AND total_cost_period > 1
+          ORDER BY total_cost_period DESC
+          LIMIT 20;
+
+      # ======================================================
+      # 3. Zombie Disk Finder (Detailed View)
+      # ======================================================
+      get_persistent_disk_costs:
+        kind: bigquery-sql
+        source: gcp-billing-source
+        description: |
+          List individual Persistent Disks to find specific volumes (PVs) or zombies.
+          Shows resource names (PVC IDs), usage units, and costs.
+          Useful for finding 0-cost disks (Free Tier) or orphaned volumes.
+        parameters:
+          - name: region
+            type: string
+            description: GCP Region (leave empty for all regions).
+            default: ""
+            required: false
+        statement: |
+          SELECT
+            REGEXP_EXTRACT(resource.name, r'disks/([^/]+)') as disk_name,
+            resource.name as full_resource_id,
+            sku.description as disk_type,
+            location.region,
+            MAX(usage.unit) as unit,
+            SUM(usage.amount) as total_usage_units,
             SUM(cost) as total_cost,
             currency
           FROM `${BIGQUERY_BILLING_DATASET}.${BIGQUERY_BILLING_TABLE}`
-          WHERE DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
-          GROUP BY date, service, currency
-          ORDER BY date DESC, total_cost DESC
-          LIMIT 10;
+          WHERE
+            DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+            AND service.description = 'Compute Engine'
+            AND (sku.description LIKE '%Storage PD%' OR sku.description LIKE '%Persistent Disk%' OR sku.description LIKE '%SSD backed PD%')
+            AND (@region IS NULL OR @region = '' OR location.region = @region)
+          GROUP BY 1, 2, 3, 4, 8
+          ORDER BY total_cost ASC
+          LIMIT 50;
+
+      # ======================================================
+      # 4. Spot Instance Opportunities
+      # ======================================================
+      get_compute_costs_by_workload:
+        kind: bigquery-sql
+        source: gcp-billing-source
+        description: |
+          Identify workloads/nodes running on Standard instances that could be Spot.
+          Calculates potential savings (estimated 70%) for namespaces like 'default' or 'kube:unallocated'.
+        parameters:
+          - name: days_back
+            type: integer
+            description: Days to analyze.
+            default: 30
+            required: false
+        statement: |
+          SELECT
+            (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') as cluster_name,
+            (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') as namespace,
+            sku.description,
+            CASE
+              WHEN LOWER(sku.description) LIKE '%preemptible%' THEN 'preemptible'
+              WHEN LOWER(sku.description) LIKE '%spot%' THEN 'spot'
+              ELSE 'standard'
+            END as instance_type,
+            SUM(cost) as total_cost_period,
+            currency,
+            -- Heuristic Savings Calculation (70% for Spot)
+            CASE
+              WHEN LOWER(sku.description) NOT LIKE '%preemptible%' AND LOWER(sku.description) NOT LIKE '%spot%'
+              THEN SUM(cost) * 0.70
+              ELSE 0
+            END as potential_spot_savings
+          FROM `${BIGQUERY_BILLING_DATASET}.${BIGQUERY_BILLING_TABLE}`
+          WHERE
+            DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 30) DAY)
+            AND (service.description = 'Kubernetes Engine' OR service.description = 'Compute Engine')
+            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            AND (sku.description LIKE '%CPU%' OR sku.description LIKE '%Ram%' OR sku.description LIKE '%Core%')
+            -- FILTER: Exclude resources without namespace
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
+            AND cost > 0
+          GROUP BY 1, 2, 3, 4, 6
+          HAVING potential_spot_savings > 0
+          ORDER BY potential_spot_savings DESC
+          LIMIT 25;
+
+      # ======================================================
+      # 5. GKE Network Egress (Hidden Costs)
+      # ======================================================
+      get_gke_network_egress:
+        kind: bigquery-sql
+        source: gcp-billing-source
+        description: |
+          Analyze GKE-specific network costs, focusing on Inter-zone traffic.
+          High inter-zone costs often indicate suboptimal pod placement (Architecture issue).
+        parameters:
+          - name: days_back
+            type: integer
+            description: Days to analyze.
+            default: 30
+            required: false
+        statement: |
+          SELECT
+            (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') as cluster_name,
+            sku.description as traffic_type,
+            SUM(usage.amount) as total_gib,
+            SUM(cost) as total_cost,
+            currency
+          FROM `${BIGQUERY_BILLING_DATASET}.${BIGQUERY_BILLING_TABLE}`
+          WHERE
+            DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 30) DAY)
+            AND service.description = 'Compute Engine'
+            AND (sku.description LIKE '%Network%' OR sku.description LIKE '%Inter-zone%' OR sku.description LIKE '%Egress%')
+            -- Ensure it is GKE related traffic
+            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            AND cost > 0
+          GROUP BY 1, 2, 5
+          ORDER BY total_cost DESC
+          LIMIT 20;
 
     toolsets:
-      test:
-        - test_billing_query
+      frugalia_finops:
+        - get_gke_resource_usage_7d
+        - get_compute_rightsizing_candidates
+        - get_persistent_disk_costs
+        - get_compute_costs_by_workload
+        - get_gke_network_egress
+
 ---
+
 apiVersion: kagent.dev/v1alpha1
 kind: MCPServer
 metadata:
@@ -56,10 +249,8 @@ spec:
     env:
       BIGQUERY_PROJECT: "level-elevator-474703-b3"
       BIGQUERY_LOCATION: "US"
-      BIGQUERY_BILLING_DATASET: "billing_export"
-      BIGQUERY_BILLING_TABLE: "gcp_billing_export_v1_018740_3FD1B7_70949B"
-      BIGQUERY_PRICING_TABLE: "cloud_pricing_export"
-      BIGQUERY_USE_CLIENT_OAUTH: "false"
+      BIGQUERY_BILLING_DATASET: "billing_export_detailed"
+      BIGQUERY_BILLING_TABLE: "gcp_billing_export_resource_v1_018740_3FD1B7_70949B"
     volumeMounts:
       - name: frugalia-tools-config
         mountPath: /configs
