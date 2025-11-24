@@ -70,10 +70,7 @@ def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
                 zombie_pvcs.append({
                     "name": pvc.metadata.name,
                     "namespace": pvc.metadata.namespace,
-                    "size": storage_size,
-                    "storage_class": pvc.spec.storage_class_name,
-                    "created_at": pvc.metadata.creation_timestamp.isoformat() if pvc.metadata.creation_timestamp else None,
-                    "type": "PersistentVolumeClaim"
+                    "size": storage_size
                 })
 
         # --- 2. Detect Zombie PVs (Released state) ---
@@ -84,11 +81,7 @@ def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
                 storage_size = pv.spec.capacity.get("storage", "unknown") if pv.spec.capacity else "unknown"
                 zombie_pvs.append({
                     "name": pv.metadata.name,
-                    "size": storage_size,
-                    "storage_class": pv.spec.storage_class_name,
-                    "reclaim_policy": pv.spec.persistent_volume_reclaim_policy,
-                    "created_at": pv.metadata.creation_timestamp.isoformat() if pv.metadata.creation_timestamp else None,
-                    "type": "PersistentVolume"
+                    "size": storage_size
                 })
 
         # --- 3. Detect Zombie LoadBalancers (No endpoints) ---
@@ -108,9 +101,7 @@ def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
                         zombie_loadbalancers.append({
                             "name": service.metadata.name,
                             "namespace": service.metadata.namespace,
-                            "load_balancer_ip": service.status.load_balancer.ingress[0].ip if service.status.load_balancer.ingress else "pending",
-                            "created_at": service.metadata.creation_timestamp.isoformat() if service.metadata.creation_timestamp else None,
-                            "type": "LoadBalancer"
+                            "ip": service.status.load_balancer.ingress[0].ip if service.status.load_balancer.ingress else "pending"
                         })
                 except client.exceptions.ApiException as e:
                     # If endpoints don't exist (404), service has no backends
@@ -118,31 +109,27 @@ def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
                         zombie_loadbalancers.append({
                             "name": service.metadata.name,
                             "namespace": service.metadata.namespace,
-                            "load_balancer_ip": service.status.load_balancer.ingress[0].ip if service.status.load_balancer.ingress else "pending",
-                            "created_at": service.metadata.creation_timestamp.isoformat() if service.metadata.creation_timestamp else None,
-                            "type": "LoadBalancer"
+                            "ip": service.status.load_balancer.ingress[0].ip if service.status.load_balancer.ingress else "pending"
                         })
-
-        total_zombies = len(zombie_pvcs) + len(zombie_pvs) + len(zombie_loadbalancers)
-
-        summary = f"Found {total_zombies} zombie resources: "
-        summary += f"{len(zombie_pvcs)} PVCs, {len(zombie_pvs)} PVs, {len(zombie_loadbalancers)} LoadBalancers"
-        if namespace:
-            summary += f" (namespace: {namespace})"
 
         return {
             "zombie_pvcs": zombie_pvcs,
             "zombie_pvs": zombie_pvs,
             "zombie_loadbalancers": zombie_loadbalancers,
-            "total_zombies": total_zombies,
-            "count_by_type": {
-                "pvcs": len(zombie_pvcs),
-                "pvs": len(zombie_pvs),
-                "loadbalancers": len(zombie_loadbalancers)
-            },
-            "summary": summary,
-            "scanned_namespace": namespace if namespace else "all namespaces"
+            "total": len(zombie_pvcs) + len(zombie_pvs) + len(zombie_loadbalancers)
         }
 
+    except client.exceptions.ApiException as e:
+        if e.status == 404:
+            return {
+                "error": f"Namespace '{namespace}' not found",
+                "status": "not_found"
+            }
+        elif e.status == 403:
+            return {
+                "error": "Permission denied to list resources (pods, PVCs, PVs, services, endpoints)",
+                "status": "forbidden"
+            }
+        return {"error": f"Kubernetes API error: {e.reason}"}
     except Exception as e:
         return {"error": f"Failed to detect zombie resources: {str(e)}"}

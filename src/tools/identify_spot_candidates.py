@@ -80,17 +80,20 @@ def identify_spot_candidates(min_replicas: int = 2) -> Dict[str, Any]:
                     "namespace": namespace,
                     "replicas": replicas,
                     "has_pdb": has_pdb,
-                    "pdb_details": pdb_details,
-                    "stateless": is_stateless,
+                    "pdb_details": pdb_details
                 })
 
         return {
-            "spot_candidates": spot_candidates,
-            "count": len(spot_candidates),
-            "message": f"Found {len(spot_candidates)} deployments that are candidates for Spot nodes.",
-            "candidates_with_pdb": sum(1 for c in spot_candidates if c["has_pdb"]),
-            "candidates_without_pdb": sum(1 for c in spot_candidates if not c["has_pdb"])
+            "candidates": spot_candidates,
+            "count": len(spot_candidates)
         }
 
+    except client.exceptions.ApiException as e:
+        if e.status == 403:
+            return {
+                "error": "Permission denied to list deployments or PodDisruptionBudgets",
+                "status": "forbidden"
+            }
+        return {"error": f"Kubernetes API error: {e.reason}"}
     except Exception as e:
         return {"error": f"Failed to identify spot candidates: {str(e)}"}

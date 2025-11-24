@@ -43,49 +43,61 @@ def get_kubernetes_resources(
         apps_v1 = client.AppsV1Api(api_client)
         policy_v1 = client.PolicyV1Api(api_client)
 
-        resources = []
-        if resource_type == "pod":
-            if namespace:
-                ret = core_v1.list_namespaced_pod(namespace)
+        try:
+            resources = []
+            if resource_type == "pod":
+                if namespace:
+                    ret = core_v1.list_namespaced_pod(namespace)
+                else:
+                    ret = core_v1.list_pod_for_all_namespaces()
+                resources = [item.metadata.name for item in ret.items]
+            elif resource_type == "service":
+                if namespace:
+                    ret = core_v1.list_namespaced_service(namespace)
+                else:
+                    ret = core_v1.list_service_for_all_namespaces()
+                resources = [item.metadata.name for item in ret.items]
+            elif resource_type == "deployment":
+                if namespace:
+                    ret = apps_v1.list_namespaced_deployment(namespace)
+                else:
+                    ret = apps_v1.list_deployment_for_all_namespaces()
+                resources = [item.metadata.name for item in ret.items]
+            elif resource_type == "poddisruptionbudget":
+                if namespace:
+                    ret = policy_v1.list_namespaced_pod_disruption_budget(namespace)
+                else:
+                    ret = policy_v1.list_pod_disruption_budget_for_all_namespaces()
+                resources = [
+                    {
+                        "name": item.metadata.name,
+                        "namespace": item.metadata.namespace,
+                        "min_available": item.spec.min_available,
+                        "max_unavailable": item.spec.max_unavailable,
+                        "selector": item.spec.selector.match_labels if item.spec.selector else None
+                    }
+                    for item in ret.items
+                ]
             else:
-                ret = core_v1.list_pod_for_all_namespaces()
-            resources = [item.metadata.name for item in ret.items]
-        elif resource_type == "service":
-            if namespace:
-                ret = core_v1.list_namespaced_service(namespace)
-            else:
-                ret = core_v1.list_service_for_all_namespaces()
-            resources = [item.metadata.name for item in ret.items]
-        elif resource_type == "deployment":
-            if namespace:
-                ret = apps_v1.list_namespaced_deployment(namespace)
-            else:
-                ret = apps_v1.list_deployment_for_all_namespaces()
-            resources = [item.metadata.name for item in ret.items]
-        elif resource_type == "poddisruptionbudget":
-            if namespace:
-                ret = policy_v1.list_namespaced_pod_disruption_budget(namespace)
-            else:
-                ret = policy_v1.list_pod_disruption_budget_for_all_namespaces()
-            resources = [
-                {
-                    "name": item.metadata.name,
-                    "namespace": item.metadata.namespace,
-                    "min_available": item.spec.min_available,
-                    "max_unavailable": item.spec.max_unavailable,
-                    "selector": item.spec.selector.match_labels if item.spec.selector else None
-                }
-                for item in ret.items
-            ]
-        else:
-            return {"error": f"Unsupported resource type: {resource_type}"}
+                return {"error": f"Unsupported resource type: {resource_type}"}
 
-        return {
-            "resources": resources,
-            "count": len(resources),
-            "message": f"Found {len(resources)} {resource_type} resources.",
-            "received_namespace": namespace,
-        }
+            return {
+                "resources": resources,
+                "count": len(resources)
+            }
+
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                return {
+                    "error": f"Namespace '{namespace}' not found",
+                    "status": "not_found"
+                }
+            elif e.status == 403:
+                return {
+                    "error": f"Permission denied to list {resource_type} in namespace '{namespace}'",
+                    "status": "forbidden"
+                }
+            raise
 
     except Exception as e:
-        return {"error": f"Failed to get Kubernetes resources: {str(e)}"}
+        return {"error": f"Failed to list {resource_type}: {str(e)}"}

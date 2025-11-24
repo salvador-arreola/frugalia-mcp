@@ -69,33 +69,18 @@ def check_nodepool_types() -> Dict[str, Any]:
                 "zone": labels.get("topology.kubernetes.io/zone", "unknown")
             })
 
-        # Generate recommendation
-        has_spot = len(spot_nodepools) > 0
-
-        if has_spot:
-            recommendation = (
-                f"✅ Spot nodepool(s) available: {', '.join(spot_nodepools)}. "
-                f"Workloads can be migrated using nodeSelector: "
-                f"{{\"cloud.google.com/gke-spot\": \"true\"}} + tolerations."
-            )
-        else:
-            recommendation = (
-                "⚠️ No Spot nodepools found. Before migrating workloads to Spot, "
-                "you must create a Spot nodepool first. Use 'gcloud container node-pools create' "
-                "with --spot flag, or create via GCP Console."
-            )
-
         return {
-            "has_spot_nodepool": has_spot,
+            "has_spot": len(spot_nodepools) > 0,
             "spot_nodepools": list(spot_nodepools),
-            "standard_nodepools": list(standard_nodepools),
-            "total_nodes": len(nodes),
-            "spot_nodes": spot_node_count,
-            "standard_nodes": standard_node_count,
-            "node_details": node_details[:10],  # Limit to 10 for context
-            "recommendation": recommendation,
-            "message": f"Found {len(nodes)} nodes: {spot_node_count} Spot, {standard_node_count} Standard"
+            "standard_nodepools": list(standard_nodepools)
         }
 
+    except client.exceptions.ApiException as e:
+        if e.status == 403:
+            return {
+                "error": "Permission denied to list nodes",
+                "status": "forbidden"
+            }
+        return {"error": f"Kubernetes API error: {e.reason}"}
     except Exception as e:
         return {"error": f"Failed to check nodepool types: {str(e)}"}

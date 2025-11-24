@@ -30,7 +30,17 @@ def analyze_rightsizing(
             config.load_kube_config()
 
         apps_v1 = client.AppsV1Api()
-        deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+
+        # Try to read deployment, handle 404 gracefully
+        try:
+            deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                return {
+                    "error": f"Deployment '{deployment_name}' not found in namespace '{namespace}'",
+                    "status": "not_found"
+                }
+            raise
 
         # Check if the deployment has resource requests defined
         container = deployment.spec.template.spec.containers[0]
