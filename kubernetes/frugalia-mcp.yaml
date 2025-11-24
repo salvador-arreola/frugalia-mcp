@@ -23,8 +23,10 @@ spec:
     args:
     - src/main.py
     cmd: python
-    image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/frugalia-mcp:b0.0.2
+    image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/frugalia-mcp:b0.0.3
     port: 3000
+    env:
+      PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
   stdioTransport: {}
   transportType: stdio
 status: {}

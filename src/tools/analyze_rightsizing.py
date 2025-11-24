@@ -32,9 +32,36 @@ def analyze_rightsizing(
         apps_v1 = client.AppsV1Api()
         deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
 
+        # Check if the deployment has resource requests defined
+        container = deployment.spec.template.spec.containers[0]
+        if not container.resources or not container.resources.requests:
+            return {
+                "namespace": namespace,
+                "deployment": deployment_name,
+                "status": "no_requests_defined",
+                "message": "Deployment does not have resource requests defined.",
+                "recommendation": (
+                    "Cannot analyze rightsizing without CPU requests. "
+                    "Add resource requests to the deployment first. "
+                    "Example: spec.template.spec.containers[0].resources.requests.cpu = '100m'"
+                )
+            }
+
         # Get the CPU request for the first container
-        cpu_request_str = deployment.spec.template.spec.containers[0].resources.requests.get("cpu", "0")
-        
+        cpu_request_str = container.resources.requests.get("cpu")
+        if not cpu_request_str:
+            return {
+                "namespace": namespace,
+                "deployment": deployment_name,
+                "status": "no_cpu_request",
+                "message": "Deployment does not have CPU request defined.",
+                "recommendation": (
+                    "Cannot analyze CPU rightsizing without CPU request. "
+                    "Add CPU request to the deployment. "
+                    "Example: spec.template.spec.containers[0].resources.requests.cpu = '100m'"
+                )
+            }
+
         # Convert CPU request to millicores
         if "m" in cpu_request_str:
             cpu_request_millicores = int(cpu_request_str.replace("m", ""))

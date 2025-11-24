@@ -11,8 +11,8 @@ from core.utils import query_prometheus
 @mcp.tool()
 def get_prometheus_metrics(
     query: str,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
+    start_time: str = "",
+    end_time: str = "",
     step: str = "1m"
 ) -> Dict[str, Any]:
     """Query Prometheus for cluster resource metrics.

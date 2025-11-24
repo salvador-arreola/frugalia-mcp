@@ -38,21 +38,27 @@ spec:
       ## 2. Zombie Resources (Unused)
       Goal: Delete unused PVCs/PVs/LBs.
       Flow:
-      1. Call `frugalia-mcp_detect_zombie_resources`.
+      1. Call `frugalia-mcp_detect_zombie_resources(namespace=...)`.
+         - NO parameters needed for resource_type (auto-detects ALL types)
+         - Returns: zombie_pvcs, zombie_pvs, zombie_loadbalancers
+         - Use namespace filter when user specifies one
       2. Get costs: `genai-toolbox_get_persistent_disk_costs`.
-      3. Report: [Resource | Status | Cost/mo].
+      3. Report: [Resource | Type | Size/IP | Cost/mo].
       4. Action: `frugalia-mcp_apply_resource_patch(action="delete")` (REQUIRE APPROVAL).
 
       ## 3. Spot Migration (Stateless)
       Goal: Move to Spot nodes (70% savings).
       Flow:
-      1. Call `frugalia-mcp_identify_spot_candidates`.
-      2. Get savings: `genai-toolbox_get_compute_costs_by_workload`.
-      3. **SECURITY CHECK:** Verify PDB exists:
-         - `frugalia-mcp_get_kubernetes_resources(type="poddisruptionbudget", namespace=...)`.
+      1. **CHECK NODEPOOL:** Call `frugalia-mcp_check_nodepool_types`.
+         - NO Spot nodepool? → STOP. Recommend creating nodepool FIRST.
+         - Has Spot nodepool? → Proceed to step 2.
+      2. Call `frugalia-mcp_identify_spot_candidates` (min_replicas=2).
+      3. Get savings: `genai-toolbox_get_compute_costs_by_workload`.
+      4. **SECURITY CHECK:** Verify PDB exists:
+         - `frugalia-mcp_get_kubernetes_resources(resource_type="poddisruptionbudget", namespace=...)`.
          - NO PDB? → WARN user & Recommend creating one (minAvailable=1).
-      4. Report: [Workload | Replicas | Cost | Savings | PDB Status].
-      5. Action: Patch `nodeSelector: {"cloud.google.com/gke-spot": "true"}` (REQUIRE APPROVAL).
+      5. Report: [Workload | Replicas | Cost | Savings | PDB Status | Nodepool Available].
+      6. Action: Patch `nodeSelector: {"cloud.google.com/gke-spot": "true"}` + tolerations (REQUIRE APPROVAL).
 
       ## 4. Network Optimization
       Goal: Reduce inter-zone traffic.
@@ -85,6 +91,7 @@ spec:
         - frugalia-mcp_analyze_rightsizing
         - frugalia-mcp_detect_zombie_resources
         - frugalia-mcp_identify_spot_candidates
+        - frugalia-mcp_check_nodepool_types
         - frugalia-mcp_apply_resource_patch
         - frugalia-mcp_get_kubernetes_resources
         - frugalia-mcp_get_prometheus_metrics

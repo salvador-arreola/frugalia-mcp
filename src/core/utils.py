@@ -72,8 +72,8 @@ from prometheus_api_client import PrometheusConnect
 
 def query_prometheus(
     query: str,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
+    start_time: str = "",
+    end_time: str = "",
     step: str = "1m"
 ) -> Dict[str, Any]:
     """Query Prometheus for cluster resource metrics.
@@ -94,7 +94,7 @@ def query_prometheus(
             - query: Original query executed
     """
     # Get Prometheus URL from environment variable, fallback to Kubernetes service
-    prometheus_url = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090")
+    prometheus_url = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
 
     try:
         # Connect to Prometheus
