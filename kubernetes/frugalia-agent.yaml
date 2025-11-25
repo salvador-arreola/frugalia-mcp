@@ -30,9 +30,9 @@ spec:
       ## 1. Rightsizing (Over-provisioned)
       Goal: Reduce requests if P99 usage < 50%.
       Flow:
-      1. Call `genai-toolbox_get_compute_rightsizing_candidates` (days_back=7).
+      1. Call `genai-toolbox-mcp_get_compute_rightsizing_candidates` (days_back=7).
       2. For candidates: `frugalia-mcp_analyze_rightsizing`.
-      3. Get costs: `genai-toolbox_get_gke_resource_usage_7d`.
+      3. Get costs: `genai-toolbox-mcp_get_gke_resource_usage_7d`.
       4. Output: Table [Workload | Request | P99 Usage | Savings].
 
       ## 2. Zombie Resources (Unused)
@@ -42,7 +42,7 @@ spec:
          - NO parameters needed for resource_type (auto-detects ALL types)
          - Returns: zombie_pvcs, zombie_pvs, zombie_loadbalancers
          - Use namespace filter when user specifies one
-      2. Get costs: `genai-toolbox_get_persistent_disk_costs`.
+      2. Get costs: `genai-toolbox-mcp_get_persistent_disk_costs`.
       3. Report: [Resource | Type | Size/IP | Cost/mo].
       4. Action: `frugalia-mcp_apply_resource_patch(action="delete")` (REQUIRE APPROVAL).
 
@@ -53,7 +53,7 @@ spec:
          - NO Spot nodepool? → STOP. Recommend creating nodepool FIRST.
          - Has Spot nodepool? → Proceed to step 2.
       2. Call `frugalia-mcp_identify_spot_candidates` (min_replicas=2).
-      3. Get savings: `genai-toolbox_get_compute_costs_by_workload`.
+      3. Get savings: `genai-toolbox-mcp_get_compute_costs_by_workload`.
       4. **SECURITY CHECK:** Verify PDB exists:
          - `frugalia-mcp_get_kubernetes_resources(resource_type="poddisruptionbudget", namespace=...)`.
          - NO PDB? → WARN user & Recommend creating one (minAvailable=1).
@@ -63,7 +63,7 @@ spec:
       ## 4. Network Optimization
       Goal: Reduce inter-zone traffic.
       Flow:
-      1. Call `genai-toolbox_get_gke_network_egress`.
+      1. Call `genai-toolbox-mcp_get_gke_network_egress`.
       2. If high cost: Recommend `topologyAwareHints`.
 
       # RESPONSE PROTOCOL
@@ -97,8 +97,11 @@ spec:
         - frugalia-mcp_get_prometheus_metrics
 
         # GenAI Toolbox (BigQuery)
-        - genai-toolbox_get_gke_resource_usage_7d
-        - genai-toolbox_get_compute_rightsizing_candidates
-        - genai-toolbox_get_compute_costs_by_workload
-        - genai-toolbox_get_persistent_disk_costs
-        - genai-toolbox_get_gke_network_egress
+        - genai-toolbox-mcp_get_gke_resource_usage_7d
+        - genai-toolbox-mcp_get_compute_rightsizing_candidates
+        - genai-toolbox-mcp_get_compute_costs_by_workload
+        - genai-toolbox-mcp_get_persistent_disk_costs
+        - genai-toolbox-mcp_get_gke_network_egress
+
+        # Slack MCP
+        - slack-mcp_conversations_add_message

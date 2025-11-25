@@ -1,14 +1,23 @@
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: frugalia-tools-config
+  name: genai-toolbox-variables
   namespace: kagent
 data:
-  frugalia-billing-queries.yaml: |
-    # Frugalia - BigQuery Billing Queries Configuration
-    # FINAL VERSION WITH DEFAULTS
-    # Added 'default' and 'required: false' based on tool schema documentation.
+  BIGQUERY_PROJECT: bGV2ZWwtZWxldmF0b3ItNDc0NzAzLWIz
+  BIGQUERY_LOCATION: VVM=
+  BIGQUERY_BILLING_DATASET: YmlsbGluZ19leHBvcnRfZGV0YWlsZWQ=
+  BIGQUERY_BILLING_TABLE: Z2NwX2JpbGxpbmdfZXhwb3J0X3Jlc291cmNlX3YxXzAxODc0MF8zRkQxQjdfNzA5NDlC
 
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genai-toolbox-queries
+  namespace: kagent
+data:
+  gke-billing-queries.yaml: |
     sources:
       gcp-billing-source:
         kind: "bigquery"
@@ -30,9 +39,8 @@ data:
         parameters:
           - name: cluster_name
             type: string
-            description: Filter by Cluster Name (leave empty for all clusters).
-            default: ""
-            required: false
+            description: Filter by Cluster Name.
+            required: true
           - name: namespace
             type: string
             description: Filter by Namespace (leave empty for all namespaces).
@@ -55,7 +63,7 @@ data:
             -- CLEANUP: Remove infrastructure overhead (nulls)
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
             -- Dynamic Filters using Named Parameters
-            AND (@cluster_name IS NULL OR @cluster_name = '' OR (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name)
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
             AND (@namespace IS NULL OR @namespace = '' OR (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') = @namespace)
           GROUP BY 1, 2, 3, 7
           ORDER BY cost_7d DESC;
@@ -70,6 +78,10 @@ data:
           Identify the most expensive GKE workloads (Namespace level) to optimize.
           Useful for finding 'kube:unallocated' costs which indicate node over-provisioning.
         parameters:
+          - name: cluster_name
+            type: string
+            description: Filter by Cluster Name.
+            required: true
           - name: days_back
             type: integer
             description: Days to analyze.
@@ -90,7 +102,7 @@ data:
           WHERE
             DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 7) DAY)
             AND (service.description = 'Kubernetes Engine' OR service.description = 'Compute Engine')
-            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
             -- FILTER: Remove fixed fees
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
             AND cost > 0
@@ -117,7 +129,6 @@ data:
             required: false
         statement: |
           SELECT
-            REGEXP_EXTRACT(resource.name, r'disks/([^/]+)') as disk_name,
             resource.name as full_resource_id,
             sku.description as disk_type,
             location.region,
@@ -131,7 +142,8 @@ data:
             AND service.description = 'Compute Engine'
             AND (sku.description LIKE '%Storage PD%' OR sku.description LIKE '%Persistent Disk%' OR sku.description LIKE '%SSD backed PD%')
             AND (@region IS NULL OR @region = '' OR location.region = @region)
-          GROUP BY 1, 2, 3, 4, 8
+          GROUP BY 1, 2, 3, 7
+          HAVING total_cost != 0
           ORDER BY total_cost ASC
           LIMIT 50;
 
@@ -145,6 +157,10 @@ data:
           Identify workloads/nodes running on Standard instances that could be Spot.
           Calculates potential savings (estimated 70%) for namespaces like 'default' or 'kube:unallocated'.
         parameters:
+          - name: cluster_name
+            type: string
+            description: Filter by Cluster Name.
+            required: true
           - name: days_back
             type: integer
             description: Days to analyze.
@@ -172,7 +188,7 @@ data:
           WHERE
             DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 30) DAY)
             AND (service.description = 'Kubernetes Engine' OR service.description = 'Compute Engine')
-            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
             AND (sku.description LIKE '%CPU%' OR sku.description LIKE '%Ram%' OR sku.description LIKE '%Core%')
             -- FILTER: Exclude resources without namespace
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
@@ -192,6 +208,10 @@ data:
           Analyze GKE-specific network costs, focusing on Inter-zone traffic.
           High inter-zone costs often indicate suboptimal pod placement (Architecture issue).
         parameters:
+          - name: cluster_name
+            type: string
+            description: Filter by Cluster Name.
+            required: true
           - name: days_back
             type: integer
             description: Days to analyze.
@@ -210,7 +230,7 @@ data:
             AND service.description = 'Compute Engine'
             AND (sku.description LIKE '%Network%' OR sku.description LIKE '%Inter-zone%' OR sku.description LIKE '%Egress%')
             -- Ensure it is GKE related traffic
-            AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
             AND cost > 0
           GROUP BY 1, 2, 5
           ORDER BY total_cost DESC
@@ -229,7 +249,7 @@ data:
 apiVersion: kagent.dev/v1alpha1
 kind: MCPServer
 metadata:
-  name: genai-toolbox
+  name: genai-toolbox-mcp
   namespace: kagent
   labels:
     kagent.dev/discovery: disabled
@@ -241,21 +261,16 @@ spec:
     cmd: "/toolbox"
     args:
       - "--tools-file"
-      - "/configs/frugalia-billing-queries.yaml"
+      - "/configs/gke-billing-queries.yaml"
       - "--stdio"
     port: 3000
-    configMapRefs:
-      - name: frugalia-tools-config
-    env:
-      BIGQUERY_PROJECT: "level-elevator-474703-b3"
-      BIGQUERY_LOCATION: "US"
-      BIGQUERY_BILLING_DATASET: "billing_export_detailed"
-      BIGQUERY_BILLING_TABLE: "gcp_billing_export_resource_v1_018740_3FD1B7_70949B"
+    secretRefs:
+      - name: genai-toolbox-variables
     volumeMounts:
-      - name: frugalia-tools-config
+      - name: genai-toolbox-queries
         mountPath: /configs
         readOnly: true
     volumes:
-    - name: frugalia-tools-config
+    - name: genai-toolbox-queries
       configMap:
-        name: frugalia-tools-config
+        name: genai-toolbox-queries

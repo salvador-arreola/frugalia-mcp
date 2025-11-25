@@ -12,9 +12,9 @@ spec:
         host: frugalia-mcp.kagent.svc.cluster.local
         port: 3000
         protocol: StreamableHTTP
-    - name: genai-toolbox
+    - name: genai-toolbox-mcp
       static:
-        host: genai-toolbox.kagent.svc.cluster.local
+        host: genai-toolbox-mcp.kagent.svc.cluster.local
         port: 3000
         protocol: StreamableHTTP
     - name: slack-mcp
