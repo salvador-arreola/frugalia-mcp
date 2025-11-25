@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: slack-mcp-credentials
+  namespace: kagent
+data:
+  SLACK_MCP_XOXP_TOKEN: eG94Yi05OTk5NTM4MDI2OTQ1LTEwMDE1MDk4MDM4MDgwLXgxOVc2TFRvOTRiYTVmRHA4RGNDWTlXQQ==
+  SLACK_MCP_ADD_MESSAGE_TOOL: QzA5VVVBTUVKRFI=
+
+---
+
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: slack-mcp
+  namespace: kagent
+  labels:
+    kagent.dev/discovery: disabled
+spec:
+  transportType: stdio
+  stdioTransport: {}
+  deployment:
+    image: ghcr.io/korotovsky/slack-mcp-server:v1.1.26
+    cmd: "mcp-server"
+    args:
+      - "--transport"
+      - "stdio"
+    port: 3000
+    secretRefs:
+    - name: slack-mcp-credentials

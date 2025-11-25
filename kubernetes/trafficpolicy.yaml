@@ -1,0 +1,28 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: frugalia-exclusive-tools
+  namespace: kagent
+spec:
+  targetRefs:
+    - name: mcp-backend
+      kind: Backend
+      group: gateway.networking.k8s.io
+  rbac:
+    policy:
+      matchExpressions:
+      - 'mcp.tool.name in [
+          "conversations_add_message",
+          "analyze_rightsizing",
+          "detect_zombie_resources",
+          "identify_spot_candidates",
+          "check_nodepool_types",
+          "apply_resource_patch",
+          "get_kubernetes_resources",
+          "get_prometheus_metrics",
+          "get_gke_resource_usage_7d",
+          "get_compute_rightsizing_candidates",
+          "get_compute_costs_by_workload",
+          "get_persistent_disk_costs",
+          "get_gke_network_egress"
+        ]'

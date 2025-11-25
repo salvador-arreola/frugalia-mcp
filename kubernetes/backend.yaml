@@ -17,3 +17,8 @@ spec:
         host: genai-toolbox.kagent.svc.cluster.local
         port: 3000
         protocol: StreamableHTTP
+    - name: slack-mcp
+      static:
+        host: slack-mcp.kagent.svc.cluster.local
+        port: 3000
+        protocol: StreamableHTTP
