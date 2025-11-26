@@ -17,6 +17,7 @@ spec:
           "detect_zombie_resources",
           "identify_spot_candidates",
           "check_nodepool_types",
+          "check_node_utilization",
           "apply_resource_patch",
           "get_kubernetes_resources",
           "get_prometheus_metrics",
@@ -24,5 +25,5 @@ spec:
           "get_compute_rightsizing_candidates",
           "get_compute_costs_by_workload",
           "get_persistent_disk_costs",
-          "get_gke_network_egress"
+          "get_gke_network_egress",
         ]'
