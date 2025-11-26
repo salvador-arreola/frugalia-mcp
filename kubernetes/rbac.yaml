@@ -11,6 +11,10 @@ rules:
     resources: ["deployments", "deployments/scale"]
     verbs: ["get", "list", "patch", "update"]
 
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list"]
+
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["get", "list", "delete"]

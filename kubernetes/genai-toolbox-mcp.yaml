@@ -62,10 +62,17 @@ data:
             AND EXISTS (SELECT 1 FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name')
             -- CLEANUP: Remove infrastructure overhead (nulls)
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
+            -- FILTER: Exclude system namespaces
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') NOT IN (
+              'kube-system', 'kube-public', 'kube-node-lease', 'kagent',
+              'kgateway-system', 'monitoring', 'logging', 'istio-system',
+              'cert-manager', 'gke-managed-cim', 'gmp-system'
+            )
             -- Dynamic Filters using Named Parameters
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
             AND (@namespace IS NULL OR @namespace = '' OR (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') = @namespace)
           GROUP BY 1, 2, 3, 7
+          HAVING cost_7d > 0
           ORDER BY cost_7d DESC;
 
       # ======================================================
@@ -105,6 +112,12 @@ data:
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
             -- FILTER: Remove fixed fees
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
+            -- FILTER: Exclude system namespaces
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') NOT IN (
+              'kube-system', 'kube-public', 'kube-node-lease', 'kagent',
+              'kgateway-system', 'monitoring', 'logging', 'istio-system',
+              'cert-manager', 'gke-managed-cim', 'gmp-system'
+            )
             AND cost > 0
           GROUP BY 1, 2, 3, 7
           HAVING cluster_name IS NOT NULL AND total_cost_period > 1
@@ -192,6 +205,12 @@ data:
             AND (sku.description LIKE '%CPU%' OR sku.description LIKE '%Ram%' OR sku.description LIKE '%Core%')
             -- FILTER: Exclude resources without namespace
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NOT NULL
+            -- FILTER: Exclude system namespaces
+            AND (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') NOT IN (
+              'kube-system', 'kube-public', 'kube-node-lease', 'kagent',
+              'kgateway-system', 'monitoring', 'logging', 'istio-system',
+              'cert-manager', 'gke-managed-cim', 'gmp-system'
+            )
             AND cost > 0
           GROUP BY 1, 2, 3, 4, 6
           HAVING potential_spot_savings > 0
@@ -231,6 +250,15 @@ data:
             AND (sku.description LIKE '%Network%' OR sku.description LIKE '%Inter-zone%' OR sku.description LIKE '%Egress%')
             -- Ensure it is GKE related traffic
             AND (SELECT value FROM UNNEST(labels) WHERE key = 'goog-k8s-cluster-name') = @cluster_name
+            -- FILTER: Exclude system namespaces (if namespace label exists)
+            AND (
+              (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') IS NULL
+              OR (SELECT value FROM UNNEST(labels) WHERE key = 'k8s-namespace') NOT IN (
+                'kube-system', 'kube-public', 'kube-node-lease', 'kagent',
+                'kgateway-system', 'monitoring', 'logging', 'istio-system',
+                'cert-manager', 'gke-managed-cim', 'gmp-system'
+              )
+            )
             AND cost > 0
           GROUP BY 1, 2, 5
           ORDER BY total_cost DESC
