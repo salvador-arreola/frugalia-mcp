@@ -1,5 +1,4 @@
-"""Check_nodepool_types tool for MCP server.
-"""
+"""Check if Spot/Preemptible nodepools exist in the cluster."""
 
 from typing import Dict, Any, List
 from kubernetes import client, config
@@ -8,22 +7,10 @@ from core.server import mcp
 
 @mcp.tool()
 def check_nodepool_types() -> Dict[str, Any]:
-    """Check nodepool types in the cluster (standard vs spot).
-
-    This tool analyzes all nodes in the cluster to determine if Spot
-    nodepools are available for workload migration. It helps the agent
-    decide whether to recommend creating a Spot nodepool first, or if
-    workloads can be migrated immediately.
+    """Analyze node types (Standard vs Spot). Determines if Spot migration is possible or if nodepool creation needed.
 
     Returns:
-        A dictionary containing:
-        - has_spot_nodepool: Boolean indicating if Spot nodes exist
-        - spot_nodepools: List of Spot nodepool names
-        - standard_nodepools: List of standard nodepool names
-        - total_nodes: Total node count
-        - spot_nodes: Count of Spot nodes
-        - standard_nodes: Count of standard nodes
-        - recommendation: Action recommendation for the agent
+        Dict with has_spot_nodepool, spot/standard counts, and migration recommendation.
     """
     try:
         # Load Kubernetes configuration

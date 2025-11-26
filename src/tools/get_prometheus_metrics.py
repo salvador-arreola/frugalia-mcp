@@ -1,7 +1,4 @@
-"""Get Prometheus metrics tool for MCP server.
-
-Queries Prometheus for cluster resource usage metrics.
-"""
+"""Execute PromQL queries for resource usage metrics."""
 
 from typing import Any, Dict, Optional
 from core.server import mcp
@@ -15,26 +12,15 @@ def get_prometheus_metrics(
     end_time: str = "",
     step: str = "1m"
 ) -> Dict[str, Any]:
-    """Query Prometheus for cluster resource metrics.
-
-    Executes PromQL queries against a Prometheus server to retrieve
-    resource usage metrics for pods, nodes, and other cluster resources.
+    """Run PromQL query against Prometheus. Supports instant and range queries.
 
     Args:
-        query: PromQL query string (e.g., "container_cpu_usage_seconds_total")
-        start_time: Start time for range query (ISO format or relative like "-7d")
-        end_time: End time for range query (ISO format or "now")
-        step: Query resolution step (e.g., "1m", "5m", "1h")
+        query: PromQL query (e.g., "container_cpu_usage_seconds_total")
+        start_time: Range query start (ISO format or "-7d")
+        end_time: Range query end (ISO format or "now")
+        step: Query resolution (default: "1m")
 
     Returns:
-        Dict containing:
-            - status: "success" or "error"
-            - data: Query results from Prometheus
-            - query: Original query executed
-
-    Example queries:
-        - CPU usage P99: 'quantile_over_time(0.99, container_cpu_usage_seconds_total[7d])'
-        - Memory usage: 'container_memory_working_set_bytes{namespace="production"}'
-        - Pod requests: 'kube_pod_container_resource_requests{resource="cpu"}'
+        Dict with status, data, and query.
     """
     return query_prometheus(query, start_time, end_time, step)

@@ -1,9 +1,9 @@
-"""Apply_resource_patch tool for MCP server.
-"""
+"""Patch or delete Kubernetes resources (deployments, PVCs, PVs, services)."""
 
 from typing import Dict, Any, Optional
 from kubernetes import client, config
 from core.server import mcp
+from core.utils import is_system_namespace
 
 @mcp.tool()
 def apply_resource_patch(
@@ -13,26 +13,27 @@ def apply_resource_patch(
     action: str,
     patch_body: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Apply_resource_patch tool implementation.
-
-    This tool applies a patch to a Kubernetes resource or deletes it.
+    """Patch or delete resources. Supports: deployment, persistentvolumeclaim, persistentvolume, service.
 
     Args:
-        resource_type: The type of resource. Supported types:
-            - "deployment" (patch/delete)
-            - "persistentvolumeclaim" (delete)
-            - "persistentvolume" (delete, cluster-scoped)
-            - "service" (delete)
-            - "loadbalancer" (delete, alias for service type LoadBalancer)
-        name: The name of the resource.
-        namespace: The namespace of the resource (not required for persistentvolume).
-        action: The action to perform ("patch" or "delete").
-        patch_body: The patch to apply (for "patch" action).
+        resource_type: Resource type (deployment/persistentvolumeclaim/persistentvolume/service)
+        name: Resource name
+        namespace: Namespace (not required for PVs)
+        action: Action ("patch" or "delete")
+        patch_body: Patch data (required for "patch")
 
     Returns:
-        A dictionary with the result of the operation.
+        Dict with operation result.
     """
     try:
+        # Protect system namespaces from modifications
+        if namespace and is_system_namespace(namespace):
+            return {
+                "error": f"Modifications to system namespace '{namespace}' are not allowed",
+                "status": "system_namespace_protected",
+                "message": "System namespaces are protected from cost optimization changes"
+            }
+
         # Load Kubernetes configuration
         try:
             config.load_incluster_config()

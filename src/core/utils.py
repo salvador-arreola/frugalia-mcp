@@ -67,8 +67,38 @@ def get_env_var(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from prometheus_api_client import PrometheusConnect
+
+# Default system namespaces to exclude from cost analysis
+DEFAULT_SYSTEM_NAMESPACES = [
+    "kube-system",
+    "kube-public",
+    "kube-node-lease",
+    "kagent",
+    "kgateway-system",
+    "monitoring",
+    "logging",
+    "istio-system",
+    "cert-manager",
+    "gke-managed-cim",
+    "gmp-system"
+]
+
+
+def is_system_namespace(namespace: str, exclude_namespaces: Optional[List[str]] = None) -> bool:
+    """Check if namespace is a system namespace that should be excluded from analysis.
+
+    Args:
+        namespace: Namespace name to check
+        exclude_namespaces: Optional list of namespaces to exclude (defaults to DEFAULT_SYSTEM_NAMESPACES)
+
+    Returns:
+        True if namespace should be excluded, False otherwise
+    """
+    if exclude_namespaces is None:
+        exclude_namespaces = DEFAULT_SYSTEM_NAMESPACES
+    return namespace in exclude_namespaces
 
 def query_prometheus(
     query: str,

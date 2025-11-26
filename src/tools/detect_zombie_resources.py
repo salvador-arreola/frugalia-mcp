@@ -1,36 +1,24 @@
-"""Detect_zombie_resources tool for MCP server.
-"""
+"""Detect unused resources (PVCs, PVs, LoadBalancers) wasting money."""
 
 from typing import List, Dict, Any, Optional
 from kubernetes import client, config
 from core.server import mcp
+from core.utils import is_system_namespace
 
 
 @mcp.tool()
-def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
-    """Detect zombie (unused) resources in the cluster.
-
-    This tool automatically scans for ALL types of zombie resources:
-    - PersistentVolumeClaims (PVCs): Bound but not mounted by any pod
-    - PersistentVolumes (PVs): Released state (claim deleted but volume remains)
-    - LoadBalancers: Services with no backend endpoints
+def detect_zombie_resources(
+    namespace: str = "",
+    exclude_namespaces: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Find orphaned PVCs, released PVs, and LoadBalancers with no backends.
 
     Args:
-        namespace: Optional. Limit scan to specific namespace.
-                   If empty, scans all namespaces (except for PVs which are cluster-scoped).
-                   RECOMMENDATION: Use specific namespace to reduce context/tokens.
+        namespace: Specific namespace to scan (empty = all non-system namespaces)
+        exclude_namespaces: Namespaces to exclude (default: system namespaces)
 
     Returns:
-        Dictionary with:
-        - zombie_pvcs: List of unused PVCs
-        - zombie_pvs: List of released PVs
-        - zombie_loadbalancers: List of LoadBalancers with no backends
-        - total_zombies: Total count
-        - summary: Human-readable summary
-
-    Example:
-        detect_zombie_resources()  # Scan all namespaces
-        detect_zombie_resources(namespace="production")  # Scan production only
+        Dict with zombie_pvcs, zombie_pvs, zombie_loadbalancers, and cost impact.
     """
     try:
         # Load Kubernetes configuration
@@ -64,6 +52,10 @@ def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
                         )
 
         for pvc in pvcs:
+            # Skip system namespaces
+            if is_system_namespace(pvc.metadata.namespace, exclude_namespaces):
+                continue
+
             pvc_key = f"{pvc.metadata.namespace}/{pvc.metadata.name}"
             if pvc.status.phase == "Bound" and pvc_key not in mounted_pvcs:
                 storage_size = pvc.spec.resources.requests.get("storage", "unknown")
@@ -91,6 +83,10 @@ def detect_zombie_resources(namespace: str = "") -> Dict[str, Any]:
             services = core_v1.list_service_for_all_namespaces().items
 
         for service in services:
+            # Skip system namespaces
+            if is_system_namespace(service.metadata.namespace, exclude_namespaces):
+                continue
+
             if service.spec.type == "LoadBalancer":
                 try:
                     endpoints = core_v1.read_namespaced_endpoints(

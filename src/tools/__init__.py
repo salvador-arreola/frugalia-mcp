@@ -6,10 +6,11 @@ Do not edit manually - it will be overwritten when tools are loaded.
 
 from .analyze_rightsizing import analyze_rightsizing
 from .apply_resource_patch import apply_resource_patch
+from .check_node_utilization import check_node_utilization
 from .check_nodepool_types import check_nodepool_types
 from .detect_zombie_resources import detect_zombie_resources
 from .get_kubernetes_resources import get_kubernetes_resources
 from .get_prometheus_metrics import get_prometheus_metrics
 from .identify_spot_candidates import identify_spot_candidates
 
-__all__ = ["analyze_rightsizing", "apply_resource_patch", "check_nodepool_types", "detect_zombie_resources", "get_kubernetes_resources", "get_prometheus_metrics", "identify_spot_candidates"]
+__all__ = ["analyze_rightsizing", "apply_resource_patch", "check_node_utilization", "check_nodepool_types", "detect_zombie_resources", "get_kubernetes_resources", "get_prometheus_metrics", "identify_spot_candidates"]

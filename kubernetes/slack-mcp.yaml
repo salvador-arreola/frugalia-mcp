@@ -4,8 +4,8 @@ metadata:
   name: slack-mcp-credentials
   namespace: kagent
 data:
-  SLACK_MCP_XOXP_TOKEN: eG94Yi05OTk5NTM4MDI2OTQ1LTEwMDE1MDk4MDM4MDgwLXgxOVc2TFRvOTRiYTVmRHA4RGNDWTlXQQ==
-  SLACK_MCP_ADD_MESSAGE_TOOL: QzA5VVVBTUVKRFI=
+  SLACK_MCP_XOXP_TOKEN: <bae64-token>
+  SLACK_MCP_ADD_MESSAGE_TOOL: <base64-channel-id>
 
 ---
 
