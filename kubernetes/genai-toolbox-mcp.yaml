@@ -8,6 +8,8 @@ data:
   BIGQUERY_LOCATION: VVM=
   BIGQUERY_BILLING_DATASET: YmlsbGluZ19leHBvcnRfZGV0YWlsZWQ=
   BIGQUERY_BILLING_TABLE: Z2NwX2JpbGxpbmdfZXhwb3J0X3Jlc291cmNlX3YxXzAxODc0MF8zRkQxQjdfNzA5NDlC
+  BIGQUERY_PRICING_DATASET: YmlsbGluZ19wcmljaW5n
+  BIGQUERY_PRICING_TABLE: Y2xvdWRfcHJpY2luZ19leHBvcnQ=
 
 ---
 
@@ -264,6 +266,61 @@ data:
           ORDER BY total_cost DESC
           LIMIT 20;
 
+      # ======================================================
+      # 6. Get GKE node pricing (Unit Economics)
+      # ======================================================
+      get_instance_pricing:
+        kind: bigquery-sql
+        source: gcp-billing-source
+        description: |
+          Get the official list prices (or negotiated rates) for Compute Engine instances (CPU & RAM).
+          Useful for calculating 'Bin-Packing' savings or 'Spot' estimation.
+          Returns the hourly cost per vCPU and per GB of RAM for the N2 family (or specified family).
+        parameters:
+          - name: region
+            type: string
+            description: GCP Region (e.g., us-central1).
+            default: "us-central1"
+            required: true
+          - name: machine_series
+            type: string
+            description: Machine family to check (e.g., N2, E2).
+            default: "N2"
+            required: false
+        statement: |
+          WITH prices AS (
+            SELECT
+              sku.description as sku_desc,
+              -- Prioritize negotiated price (billing account), fallback to list price
+              COALESCE(
+                billing_account_price.tiered_rates[SAFE_OFFSET(0)].account_currency_amount,
+                list_price.tiered_rates[SAFE_OFFSET(0)].account_currency_amount
+              ) as price_per_unit,
+              currency_conversion_rate
+            FROM `${BIGQUERY_PRICING_DATASET}.${BIGQUERY_PRICING_TABLE}`
+            WHERE
+              service.description = 'Compute Engine'
+              -- Dynamic filter for machine family (N2, E2, etc)
+              AND sku.description LIKE CONCAT(@machine_series, ' Instance % running in Americas')
+              -- Filter by requested region
+              AND EXISTS (SELECT 1 FROM UNNEST(geo_taxonomy.regions) AS r WHERE r = @region)
+              -- Get only the latest price export
+              AND export_time = (
+                SELECT MAX(export_time) 
+                FROM `${BIGQUERY_PRICING_DATASET}.${BIGQUERY_PRICING_TABLE}`
+              )
+          )
+          SELECT
+            @machine_series as family,
+            MAX(CASE WHEN sku_desc LIKE '%Core%' THEN price_per_unit ELSE 0 END) as price_per_vcpu_hour,
+            MAX(CASE WHEN sku_desc LIKE '%Ram%' THEN price_per_unit ELSE 0 END) as price_per_gb_ram_hour,
+            MAX(currency_conversion_rate) as currency_rate,
+            -- Helper calculation for N2-Standard-4 (Common case)
+            (MAX(CASE WHEN sku_desc LIKE '%Core%' THEN price_per_unit ELSE 0 END) * 4) +
+            (MAX(CASE WHEN sku_desc LIKE '%Ram%' THEN price_per_unit ELSE 0 END) * 16) as hourly_cost_n2_standard_4
+          FROM prices
+          LIMIT 1;
+
     toolsets:
       frugalia_finops:
         - get_gke_resource_usage_7d
@@ -271,6 +328,7 @@ data:
         - get_persistent_disk_costs
         - get_compute_costs_by_workload
         - get_gke_network_egress
+        - get_instance_pricing
 
 ---
 

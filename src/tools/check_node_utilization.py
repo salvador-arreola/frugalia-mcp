@@ -89,10 +89,15 @@ def check_node_utilization(
                 field_selector = f"spec.nodeName={node_name}"
                 pods_on_node = v1.list_pod_for_all_namespaces(field_selector=field_selector).items
 
+                # Extract machine family from instance type
+                instance_type = labels.get("node.kubernetes.io/instance-type", "unknown")
+                machine_family = instance_type.split('-')[0].upper() if '-' in instance_type else "UNKNOWN"
+
                 underutilized_nodes.append({
                     "name": node_name,
                     "node_pool": labels.get("cloud.google.com/gke-nodepool", "unknown"),
-                    "instance_type": labels.get("node.kubernetes.io/instance-type", "unknown"),
+                    "instance_type": instance_type,
+                    "machine_family": machine_family,
                     "cpu": {
                         "capacity_millicores": cpu_capacity,
                         "usage_millicores": round(cpu_usage_millicores, 2),

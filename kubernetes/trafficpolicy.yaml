@@ -26,4 +26,5 @@ spec:
           "get_compute_costs_by_workload",
           "get_persistent_disk_costs",
           "get_gke_network_egress",
+          "get_instance_pricing"
         ]'
