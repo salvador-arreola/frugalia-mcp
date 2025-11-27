@@ -270,6 +270,8 @@ def analyze_rightsizing(
         return {
             "namespace": namespace,
             "deployment": deployment_name,
+            "container_name": container.name,
+            "container_image": container.image,
             "deployment_age_days": round(deployment_age_days, 1) if deployment_age_days else "unknown",
             "cpu": {
                 "current_request": f"{cpu_request_millicores}m" if cpu_request_millicores else "not set",
