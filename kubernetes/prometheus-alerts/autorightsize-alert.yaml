@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: frugalia-autorightsize
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: frugalia-mcp
+spec:
+  groups:
+  - name: frugalia.autorightsize
+    interval: 30s
+    rules:
+    # Alert: Reduce CPU usage if < 5%
+    - alert: AutoRightsizeWorkload
+      expr: |     
+        (
+          sum by (owner_name) (
+            label_replace(
+              rate(container_cpu_usage_seconds_total{namespace="default", image!=""}[10m]),
+              "owner_name", "$1",
+              "pod", "(.*)-[a-z0-9]+-[a-z0-9]+"
+            )
+          )
+          /
+          sum by (owner_name) (
+            label_replace(
+              kube_pod_container_resource_requests{namespace="default", resource="cpu"},
+              "owner_name", "$1",
+              "pod", "(.*)-[a-z0-9]+-[a-z0-9]+"
+            )
+          )
+        ) * 100 < 5
+      for: 5m
+      labels:
+        severity: warning
+        component: frugalia-agent
+        mode: autonomous
+      annotations:
+        summary: "Low CPU usage in {{ $labels.namespace }}"
+        description: "CPU usage is less than 5% in {{ $labels.owner_name }} deployment. Reducing until usage is correct "
+        action: |
+          MODE: AUTONOMOUS (NO USER CONFIRMATION).
+          Context: Deployment '{{ $labels.owner_name }}' in '{{ $labels.namespace }}' is massively over-provisioned (<5% usage).
+          Cluster: frugalia-demo. Slack Channel: #frugalia
+          
+          TASK:
+          1. Reduce BOTH:
+             - CPU requests by 50%
+             - CPU limits by 50%
+          2. Notify Slack with detailed optimization report

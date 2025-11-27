@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: frugalia-zombie-pv
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: frugalia-mcp
+spec:
+  groups:
+  - name: frugalia.zombie_pv
+    interval: 30s
+    rules:
+    # Alert: Released PV (PVC deleted but volume remains)
+    - alert: AutoPurgeUnusedPV
+      expr: |
+        kube_persistentvolume_status_phase{phase="Released"} == 1
+      for: 5m
+      labels:
+        severity: warning
+        component: frugalia-agent
+        mode: autonomous
+      annotations:
+        summary: "Released PV detected: {{ $labels.persistentvolume }}"
+        description: "PersistentVolume {{ $labels.persistentvolume }} is in Released state. The claim was deleted but the volume remains. Cost: ~$20-100/month depending on size."
+        action: |
+          MODE: AUTONOMOUS (NO USER CONFIRMATION).
+          Context: persistentvolume '{{ $labels.persistentvolume }}' is not attached to any Pod.
+          Cluster: frugalia-demo. Slack Channel: #frugalia
+          
+          VALIDATE BEFORE DELETE:
+          1. Confirm PV ID exists in disk costs result
+          2. Check if associated cost > $0.01
+          3. BOTH conditions are FALSE, DO NOT DELETE
+          4. If conditions are TRUE, proceed with deletion
+          5. Notify Slack with detailed optimization report

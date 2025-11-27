@@ -1,0 +1,11 @@
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.git/
+.gitignore
+.DS_Store
+Dockerfile
+*.yaml
+venv
