@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: frugalia-node-utilization
+  namespace: kagent
+  labels:
+    app: frugalia
+    workflow: node-utilization
+spec:
+  schedule: "0 20 * * *"  # 8 PM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: frugalia
+            workflow: node-utilization
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: frugalia-trigger
+            image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/kagent:b0.0.1
+            command:
+            - /bin/sh
+            - -c
+            - |
+              kagent invoke \
+                --agent frugalia-agent \
+                --kagent-url http://kagent-controller.kagent.svc:8083 \
+                --task "Cluster: frugalia-demo. Slack Channel: #frugalia Check node utilization (threshold 30%). Calculate costs and identify empty/underutilized nodes for bin-packing. Notify Slack with detailed optimization report." \
+                -n kagent

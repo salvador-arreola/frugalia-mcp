@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: frugalia-zombie-resources
+  namespace: kagent
+  labels:
+    app: frugalia
+    workflow: zombie-resources
+spec:
+  schedule: "0 23 * * *"  # 11 PM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: frugalia
+            workflow: zombie-resources
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: frugalia-trigger
+            image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/kagent:b0.0.1
+            command:
+            - /bin/sh
+            - -c
+            - |
+              kagent invoke \
+                --agent frugalia-agent \
+                --kagent-url http://kagent-controller.kagent.svc:8083 \
+                --task "Cluster: frugalia-demo. Slack Channel: #frugalia Scan zombie resources (unused PVCs, released PVs, empty LoadBalancers). Calculate waste costs. Notify Slack with detailed optimization report. Do NOT delete without confirmation." \
+                -n kagent

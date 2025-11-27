@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: frugalia-spot-migration
+  namespace: kagent
+  labels:
+    app: frugalia
+    workflow: spot-migration
+spec:
+  schedule: "0 22 * * *"  # 10 PM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: frugalia
+            workflow: spot-migration
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: frugalia-trigger
+            image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/kagent:b0.0.1
+            command:
+            - /bin/sh
+            - -c
+            - |
+              kagent invoke \
+                --agent frugalia-agent \
+                --kagent-url http://kagent-controller.kagent.svc:8083 \
+                --task "Cluster: frugalia-demo. Slack Channel: #frugalia Find Spot migration candidates. Check safety (PDB, safe-to-evict). Calculate costs (60% savings). Notify Slack with detailed optimization report." \
+                -n kagent

@@ -9,11 +9,9 @@ metadata:
 spec:
   type: Declarative
   description: GKE FinOps agent for cost optimization - rightsizing, zombie detection, and spot instance recommendations
-
   declarative:
     modelConfig: claude-model-config
     stream: true
-
     systemMessage: |
       ROLE: Senior FinOps Architect.
       OBJECTIVE: Maximize cluster efficiency and reliability. Minimize waste.

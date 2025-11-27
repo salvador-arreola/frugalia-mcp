@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: frugalia-rightsizing-audit
+  namespace: kagent
+  labels:
+    app: frugalia
+    workflow: rightsizing
+spec:
+  schedule: "0 21 * * *"  # 9 PM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: frugalia
+            workflow: rightsizing
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: frugalia-trigger
+            image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/kagent:b0.0.1
+            command:
+            - /bin/sh
+            - -c
+            - |
+              kagent invoke \
+                --agent frugalia-agent \
+                --kagent-url http://kagent-controller.kagent.svc:8083 \
+                --task "Cluster: frugalia-demo. Slack Channel: #frugalia Run rightsizing audit for namespace production (last 7 days). Report over-provisioned deployments with current cost and savings. Notify Slack with detailed optimization report." \
+                -n kagent
+
