@@ -8,6 +8,7 @@ metadata:
     workflow: zombie-resources
 spec:
   schedule: "0 23 * * *"  # 11 PM
+  timeZone: "America/Mexico_City"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   concurrencyPolicy: Forbid
@@ -31,5 +32,5 @@ spec:
               kagent invoke \
                 --agent frugalia-agent \
                 --kagent-url http://kagent-controller.kagent.svc:8083 \
-                --task "Cluster: frugalia-demo. Slack Channel: #frugalia Scan zombie resources (unused PVCs, released PVs, empty LoadBalancers). Calculate waste costs. Notify Slack with detailed optimization report. Do NOT delete without confirmation." \
+                --task "Cluster: frugalia-demo. Slack Channel: #frugalia Scan zombie resources (unused PVCs, released PVs, empty LoadBalancers). Calculate waste costs. Notify Slack with detailed optimization report and resource names. Do NOT delete without confirmation." \
                 -n kagent

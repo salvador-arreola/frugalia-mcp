@@ -8,6 +8,7 @@ metadata:
     workflow: spot-migration
 spec:
   schedule: "0 22 * * *"  # 10 PM
+  timeZone: "America/Mexico_City"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   concurrencyPolicy: Forbid

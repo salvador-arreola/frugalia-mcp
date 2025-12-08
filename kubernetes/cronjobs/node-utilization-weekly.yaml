@@ -8,6 +8,7 @@ metadata:
     workflow: node-utilization
 spec:
   schedule: "0 20 * * *"  # 8 PM
+  timeZone: "America/Mexico_City"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   concurrencyPolicy: Forbid
