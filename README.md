@@ -17,6 +17,7 @@ flowchart BT
         SlackMCP["MCPServer<br>slack-mcp"]
   end
  subgraph ns_kagent["Namespace: kagent"]
+        CronJobs["CronJobs<br>(e.g., zombie-resources)"]
         Webhook["Deployment/Service<br>alert-webhook"]
         Agent["Agent<br>frugalia-agent"]
         RemoteMCP["RemoteMCPServer<br>agw-mcp-servers"]
@@ -28,7 +29,8 @@ flowchart BT
         ns_kagent
   end
     AlertRule -- Triggers --> PromManager
-    Webhook -- kagent invoke --> Agent
+    Webhook -- kagent invoke<br>(Event-Driven) --> Agent
+    CronJobs -- kagent invoke<br>(Scheduled Tasks) --> Agent
     Agent -- Requests Tools --> RemoteMCP
     RemoteMCP -- Routes secure traffic --> Gateway
     Gateway -- Routes to tool --> FrugaliaMCP & GenAIMCP & SlackMCP
@@ -42,14 +44,17 @@ flowchart BT
      GenAIMCP:::mcp
      SlackMCP:::mcp
      Webhook:::webhook
+     CronJobs:::cronjob
      Agent:::agent
      K8sAPI:::external
      BigQuery:::external
      SlackAPI:::external
+     
     classDef k8s fill:#326ce5,stroke:#fff,stroke-width:2px,color:#fff
     classDef agent fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff
     classDef mcp fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff
     classDef webhook fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff
+    classDef cronjob fill:#eab308,stroke:#fff,stroke-width:2px,color:#fff
     classDef external fill:#475569,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
