@@ -4,6 +4,55 @@
 
 ## Overview
 
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'background':'#ffffff', 'mainBkg':'#ffffff', 'secondBkg':'#ffffff', 'tertiaryBkg':'#ffffff', 'primaryColor':'#e1f5ff', 'primaryTextColor':'#000', 'primaryBorderColor':'#0288d1', 'lineColor':'#666', 'secondaryColor':'#fff3e0', 'tertiaryColor':'#f3e5f5', 'clusterBkg':'#e1f5ff', 'clusterBorder':'#0288d1', 'edgeLabelBackground':'#ffffff' }}}%%
+flowchart BT
+ subgraph ns_monitoring["Namespace: monitoring"]
+        AlertRule["PrometheusRule<br>(e.g., frugalia-zombie-pv)"]
+        PromManager["Prometheus / AlertManager"]
+  end
+ subgraph MCP_Servers["MCP Servers"]
+        FrugaliaMCP["MCPServer<br>frugalia-mcp"]
+        GenAIMCP["MCPServer<br>genai-toolbox-mcp"]
+        SlackMCP["MCPServer<br>slack-mcp"]
+  end
+ subgraph ns_kagent["Namespace: kagent"]
+        Webhook["Deployment/Service<br>alert-webhook"]
+        Agent["Agent<br>frugalia-agent"]
+        RemoteMCP["RemoteMCPServer<br>agw-mcp-servers"]
+        Gateway["kgateway<br>(mcp-gateway + mcp-route)"]
+        MCP_Servers
+  end
+ subgraph GKE["GKE Cluster"]
+        ns_monitoring
+        ns_kagent
+  end
+    AlertRule -- Triggers --> PromManager
+    Webhook -- kagent invoke --> Agent
+    Agent -- Requests Tools --> RemoteMCP
+    RemoteMCP -- Routes secure traffic --> Gateway
+    Gateway -- Routes to tool --> FrugaliaMCP & GenAIMCP & SlackMCP
+    PromManager -- Webhook Payload<br>POST /webhook/alertmanager --> Webhook
+    FrugaliaMCP -. Queries P99 Metrics .-> PromManager
+    FrugaliaMCP -. Read/Patch Resources .-> K8sAPI[("Kubernetes API")]
+    GenAIMCP -. Queries Billing Data .-> BigQuery[("GCP BigQuery")]
+    SlackMCP -. Sends Final Report .-> SlackAPI[("Slack API")]
+
+     FrugaliaMCP:::mcp
+     GenAIMCP:::mcp
+     SlackMCP:::mcp
+     Webhook:::webhook
+     Agent:::agent
+     K8sAPI:::external
+     BigQuery:::external
+     SlackAPI:::external
+    classDef k8s fill:#326ce5,stroke:#fff,stroke-width:2px,color:#fff
+    classDef agent fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff
+    classDef mcp fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff
+    classDef webhook fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff
+    classDef external fill:#475569,stroke:#fff,stroke-width:2px,color:#fff
+```
+
 Frugalia empowers AI agents (deployed with [kagent](https://kagent.dev)) to analyze GKE clusters and recommend cost-saving actions:
 
 1. **Rightsizing**: Reduce CPU/memory requests for over-provisioned workloads
