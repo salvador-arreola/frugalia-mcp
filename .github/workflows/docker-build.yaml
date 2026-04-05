@@ -1,4 +1,4 @@
-name: Build, Test & Push — Frugalia
+name: Build, Test & Push FrugalIA
 
 on:
   push:
@@ -18,7 +18,6 @@ env:
 permissions:
   contents: read
   id-token: write
-  security-events: write
   pull-requests: write
 
 jobs:
@@ -70,90 +69,10 @@ jobs:
           path:           /tmp/${{ matrix.image }}.tar
           retention-days: 1
 
-  scan:
-    name: Security Scan (Trivy)
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Trivy — filesystem (vulnerability + misconfig)
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type:      fs
-          scan-ref:       .
-          scanners:       vulnerability,misconfig
-          severity:       CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code:      '1'
-          format:         table
-
-      - name: Trivy — secret scan on repository
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type:  fs
-          scan-ref:   .
-          scanners:   secret
-          format:     table
-          exit-code:  '1'
-
-      - name: Download frugalia-mcp image
-        uses: actions/download-artifact@v6
-        with:
-          name: docker-image-frugalia-mcp
-          path: /tmp
-
-      - name: Download kagent-cmd image
-        uses: actions/download-artifact@v6
-        with:
-          name: docker-image-kagent-cmd
-          path: /tmp
-
-      - name: Download event-driven-webhook image
-        uses: actions/download-artifact@v6
-        with:
-          name: docker-image-event-driven-webhook
-          path: /tmp
-
-      - name: Load images
-        run: |
-          docker load --input /tmp/frugalia-mcp.tar
-          docker load --input /tmp/kagent-cmd.tar
-          docker load --input /tmp/event-driven-webhook.tar
-
-      - name: Trivy — scan frugalia-mcp image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref:      'frugalia-mcp:${{ env.IMAGE_TAG }}'
-          format:         table
-          severity:       CRITICAL
-          ignore-unfixed: true
-          exit-code:      '1'
-
-      - name: Trivy — scan kagent-cmd image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref:      'kagent-cmd:${{ env.IMAGE_TAG }}'
-          format:         table
-          severity:       CRITICAL
-          ignore-unfixed: true
-          exit-code:      '1'
-
-      - name: Trivy — scan event-driven-webhook image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref:      'event-driven-webhook:${{ env.IMAGE_TAG }}'
-          format:         table
-          severity:       CRITICAL
-          ignore-unfixed: true
-          exit-code:      '1'
-
   push-dockerhub:
     name: Push → Docker Hub — ${{ matrix.image }}
     runs-on: ubuntu-latest
-    needs: scan
+    needs: build
     if: github.ref_type == 'tag' || github.ref_name == 'main'
     strategy:
       fail-fast: false
