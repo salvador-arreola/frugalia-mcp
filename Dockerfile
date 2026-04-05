@@ -1,5 +1,5 @@
 # Multi-stage build for frugalia-mcp MCP server using uv
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -8,7 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy dependency files first for layer caching
-COPY pyproject.toml .python-version ./
+COPY pyproject.toml ./
 COPY README.md ./
 
 # Copy lockfile if it exists, otherwise generate it
