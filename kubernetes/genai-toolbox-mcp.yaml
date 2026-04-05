@@ -4,12 +4,12 @@ metadata:
   name: genai-toolbox-variables
   namespace: kagent
 data:
-  BIGQUERY_PROJECT: bGV2ZWwtZWxldmF0b3ItNDc0NzAzLWIz
-  BIGQUERY_LOCATION: VVM=
-  BIGQUERY_BILLING_DATASET: YmlsbGluZ19leHBvcnRfZGV0YWlsZWQ=
-  BIGQUERY_BILLING_TABLE: Z2NwX2JpbGxpbmdfZXhwb3J0X3Jlc291cmNlX3YxXzAxODc0MF8zRkQxQjdfNzA5NDlC
-  BIGQUERY_PRICING_DATASET: YmlsbGluZ19wcmljaW5n
-  BIGQUERY_PRICING_TABLE: Y2xvdWRfcHJpY2luZ19leHBvcnQ=
+  BIGQUERY_PROJECT: <bae64-gcp-project-id>
+  BIGQUERY_LOCATION: <base64-location>
+  BIGQUERY_BILLING_DATASET: <base64-billing-export-dataset>
+  BIGQUERY_BILLING_TABLE: <base64-billing-export-table>
+  BIGQUERY_PRICING_DATASET: <base64-pricing-dataset>
+  BIGQUERY_PRICING_TABLE: <base64-pricing-table>
 
 ---
 

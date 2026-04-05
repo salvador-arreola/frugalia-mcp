@@ -33,7 +33,6 @@ def detect_zombie_resources(
         zombie_pvs = []
         zombie_loadbalancers = []
 
-        # --- 1. Detect Zombie PVCs (Bound but not mounted) ---
         if namespace:
             pvcs = core_v1.list_namespaced_persistent_volume_claim(namespace).items
             pods = core_v1.list_namespaced_pod(namespace).items
@@ -65,7 +64,6 @@ def detect_zombie_resources(
                     "size": storage_size
                 })
 
-        # --- 2. Detect Zombie PVs (Released state) ---
         # PVs are cluster-scoped (no namespace)
         pvs = core_v1.list_persistent_volume().items
         for pv in pvs:
@@ -76,7 +74,6 @@ def detect_zombie_resources(
                     "size": storage_size
                 })
 
-        # --- 3. Detect Zombie LoadBalancers (No endpoints) ---
         if namespace:
             services = core_v1.list_namespaced_service(namespace).items
         else:

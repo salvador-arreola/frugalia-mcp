@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="FrugalIA Trigger")
 
 
-# --- Pydantic Models for AlertManager Payload ---
-
 class Alert(BaseModel):
     status: str
     labels: dict
@@ -40,8 +38,6 @@ class AlertManagerPayload(BaseModel):
     alerts: list[Alert]
 
 
-# --- Webhook Endpoint ---
-
 @app.post("/webhook/alertmanager")
 async def alertmanager_webhook(payload: AlertManagerPayload):
     """
@@ -58,7 +54,7 @@ async def alertmanager_webhook(payload: AlertManagerPayload):
             logger.info(f"Ignoring non-firing alert '{alert_name}'. Status: {alert.status}")
             continue
 
-        # The 'action' annotation contains the prompt for the AI agent (in English)
+        # The 'action' annotation contains the prompt for the AI agent
         task_from_alert = alert.annotations.get("action")
 
         if not task_from_alert:

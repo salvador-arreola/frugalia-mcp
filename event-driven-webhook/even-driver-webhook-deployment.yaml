@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: webhook
-        image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/event-driven-webhook:b0.0.1
+        image: salvadorarreola/event-driven-webhook:b0.0.1
         ports:
         - containerPort: 8080
         env:

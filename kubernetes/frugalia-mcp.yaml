@@ -8,7 +8,7 @@ metadata:
 spec:
   transportType: stdio
   deployment:
-    image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/frugalia-mcp:b0.0.8
+    image: salvadorarreola/frugalia-mcp:b0.0.1
     cmd: "python"
     args:
     - "src/main.py"

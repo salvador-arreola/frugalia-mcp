@@ -24,7 +24,7 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: frugalia-trigger
-            image: us-central1-docker.pkg.dev/level-elevator-474703-b3/mcp/kagent:b0.0.1
+            image: salvadorarreola/kagent-cmd:b0.0.1
             command:
             - /bin/sh
             - -c
